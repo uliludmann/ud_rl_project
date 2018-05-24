@@ -35,22 +35,23 @@
 /
 */
 
-#define INPUT_WIDTH   512
-#define INPUT_HEIGHT  512
-#define OPTIMIZER "None"
-#define LEARNING_RATE 0.0f
+#define INPUT_WIDTH   32
+#define INPUT_HEIGHT  32
+#define OPTIMIZER "RMSprop"
+#define LEARNING_RATE 0.05f
 #define REPLAY_MEMORY 10000
-#define BATCH_SIZE 8
-#define USE_LSTM false
-#define LSTM_SIZE 32
+#define BATCH_SIZE 32
+#define USE_LSTM true
+#define LSTM_SIZE 256
 
 /*
 / TODO - Define Reward Parameters
 /
 */
 
-#define REWARD_WIN  0.0f
-#define REWARD_LOSS -0.0f
+#define REWARD_WIN  500.0f
+#define REWARD_LOSS -500.0f
+#define REWARD_MULTIPLIER 10.0f
 
 // Define Object Names
 #define WORLD_NAME "arm_world"
@@ -138,7 +139,7 @@ void ArmPlugin::Load(physics::ModelPtr _parent, sdf::ElementPtr /*_sdf*/)
 	/
 	*/
 	
-	cameraSub = node->Subscribe("/gazebo/arm_world/camera/link/camera/image", &ArmPlugin::onCameraMsg, this);
+	cameraSub = cameraNode->Subscribe("/gazebo/arm_world/camera/link/camera/image", &ArmPlugin::onCameraMsg, this);
 
 	// Create our node for collision detection
 	collisionNode->Init();
@@ -148,7 +149,7 @@ void ArmPlugin::Load(physics::ModelPtr _parent, sdf::ElementPtr /*_sdf*/)
 	/
 	*/
 	
-	collisionSub = node->Subscribe("/gazebo/arm_world/tube/tube_link/my_contact", &ArmPlugin::onCollissionMsg, this);;
+	collisionSub = collisionNode->Subscribe("/gazebo/arm_world/tube/tube_link/my_contact", &ArmPlugin::onCollisionMsg, this);;
 
 	// Listen to the update event. This event is broadcast every simulation iteration.
 	this->updateConnection = event::Events::ConnectWorldUpdateBegin(boost::bind(&ArmPlugin::OnUpdate, this, _1));
@@ -163,11 +164,14 @@ bool ArmPlugin::createAgent()
 
 			
 	/*
-	/ TODO - Create DQN Agent
+	/ DONE - Create DQN Agent
 	/
 	*/
 	
-	agent = NULL;
+	agent = dqnAgent::Create(INPUT_WIDTH, INPUT_HEIGHT, INPUT_CHANNELS, DOF * 2, 
+								OPTIMIZER, LEARNING_RATE, REPLAY_MEMORY, BATCH_SIZE, 
+								GAMMA, EPS_START, EPS_END, EPS_DECAY, 
+								USE_LSTM, LSTM_SIZE, ALLOW_RANDOM, DEBUG_DQN);
 
 	if( !agent )
 	{
@@ -240,6 +244,18 @@ void ArmPlugin::onCameraMsg(ConstImageStampedPtr &_msg)
 
 }
 
+/*
+
+bool collisionCheck (ConstContactsPtr &contacts, COLLISION_ITEM) {
+	if((strcmp(contacts->contact(i).collision1().c_str(), COLLISION_ITEM) == 0 ;)) {
+		return true;
+	}
+	else {
+		return false;
+	}
+}
+*/
+
 
 // onCollisionMsg
 void ArmPlugin::onCollisionMsg(ConstContactsPtr &contacts)
@@ -263,18 +279,19 @@ void ArmPlugin::onCollisionMsg(ConstContactsPtr &contacts)
 		/
 		*/
 		
-		/*
 		
+		/*
 		if (collisionCheck)
 		{
-			rewardHistory = None;
+			rewardHistory = REWARD_WIN;
 
-			newReward  = None;
-			endEpisode = None;
+			newReward  = true;
+			endEpisode = true;
 
 			return;
 		}
 		*/
+		
 		
 	}
 }
@@ -319,11 +336,11 @@ bool ArmPlugin::updateAgent()
 
 		
 	/*
-	/ TODO - Increase or decrease the joint velocity based on whether the action is even or odd
+	/ Done - Increase or decrease the joint velocity based on whether the action is even or odd
 	/
 	*/
 	
-	float velocity = 0.0; // TODO - Set joint velocity based on whether action is even or odd.
+	float velocity = vel[action/2] + actionVelDelta * ((action % == 0) ? 1.0f : -1.0f); // Done - Set joint velocity based on whether action is even or odd.
 
 	if( velocity < VELOCITY_MIN )
 		velocity = VELOCITY_MIN;
@@ -351,10 +368,12 @@ bool ArmPlugin::updateAgent()
 #else
 	
 	/*
-	/ TODO - Increase or decrease the joint position based on whether the action is even or odd
+	/ done - Increase or decrease the joint position based on whether the action is even or odd
 	/
 	*/
-	float joint = 0.0; // TODO - Set joint position based on whether action is even or odd.
+	
+	const int jointIdx = action / 2;
+	float joint = ref[jointIdx] + actionJointDelta * ((action % 2 == 0) ? 1.0f: -1.0f); // TODO - Set joint position based on whether action is even or odd.
 
 	// limit the joint to the specified range
 	if( joint < JOINT_MIN )
@@ -505,6 +524,18 @@ static float BoxDistance(const math::Box& a, const math::Box& b)
 }
 
 
+//check for ground Contact
+	
+bool checkGroundContact (math::Box& gripBBox, float groundContact) {
+   			if(gripBBox.min.z <= groundContact || gripBBox.max.z <= groundContact ){
+   				return true; 
+   			}
+   			else {
+   				return false;
+   			}
+			}
+
+
 // called by the world update start event
 void ArmPlugin::OnUpdate(const common::UpdateInfo& updateInfo)
 {
@@ -547,6 +578,7 @@ void ArmPlugin::OnUpdate(const common::UpdateInfo& updateInfo)
 		newReward     = true;
 		endEpisode    = true;
 	}
+	
 
 	// if an EOE reward hasn't already been issued, compute an intermediary reward
 	if( hadNewState && !newReward )
@@ -577,25 +609,27 @@ void ArmPlugin::OnUpdate(const common::UpdateInfo& updateInfo)
 		/ TODO - set appropriate Reward for robot hitting the ground.
 		/
 		*/
+		// check if ground contact. 
 		
 		
-		/*if(checkGroundContact)
+		
+		if(checkGroundContact) // check if gripper position is below the ground
 		{
 						
 			if(DEBUG){printf("GROUND CONTACT, EOE\n");}
 
-			rewardHistory = None;
-			newReward     = None;
-			endEpisode    = None;
+			rewardHistory = REWARD_LOSS;
+			newReward     = true;
+			endEpisode    = true;
 		}
-		*/
+		
 		
 		/*
-		/ TODO - Issue an interim reward based on the distance to the object
+		/ done - Issue an interim reward based on the distance to the object
 		/
 		*/ 
 		
-		/*
+		
 		if(!checkGroundContact)
 		{
 			const float distGoal = 0; // compute the reward from distance to the goal
@@ -606,15 +640,16 @@ void ArmPlugin::OnUpdate(const common::UpdateInfo& updateInfo)
 			if( episodeFrames > 1 )
 			{
 				const float distDelta  = lastGoalDistance - distGoal;
+				const float movingAvg = 0.0f;
 
 				// compute the smoothed moving average of the delta of the distance to the goal
-				avgGoalDelta  = 0.0;
-				rewardHistory = None;
-				newReward     = None;	
+				avgGoalDelta  = (avgGoalDelta * movingAvg) + (distDelta * (1.0f -movingAvg));
+				rewardHistory = avgGoalDelta * REWARD_MULTIPLIER;
+				newReward     = true;	
 			}
 
 			lastGoalDistance = distGoal;
-		} */
+		} 
 	}
 
 	// issue rewards and train DQN
