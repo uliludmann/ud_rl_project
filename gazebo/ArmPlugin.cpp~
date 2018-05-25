@@ -14,6 +14,8 @@
 
 #define JOINT_MIN	-0.75f
 #define JOINT_MAX	 2.0f
+#define BASE_JOINT_MIN -0.75f
+#define BASE_JOINT_MAX 0.75f
 
 // Turn on velocity based control
 #define VELOCITY_CONTROL false
@@ -35,14 +37,15 @@
 /
 */
 
-#define INPUT_WIDTH   32
-#define INPUT_HEIGHT  32
+#define INPUT_WIDTH   64
+#define INPUT_HEIGHT  64
 #define OPTIMIZER "RMSprop"
-#define LEARNING_RATE 0.05f
+#define LEARNING_RATE 0.1f
 #define REPLAY_MEMORY 10000
 #define BATCH_SIZE 32
 #define USE_LSTM true
 #define LSTM_SIZE 256
+
 
 /*
 / TODO - Define Reward Parameters
@@ -67,7 +70,7 @@
 #define ANIMATION_STEPS 1000
 
 // Set Debug Mode
-#define DEBUG false
+#define DEBUG true
 
 // Lock base rotation DOF (Add dof in header file if off)
 #define LOCKBASE true
@@ -244,17 +247,17 @@ void ArmPlugin::onCameraMsg(ConstImageStampedPtr &_msg)
 
 }
 
-/*
 
-bool collisionCheck (ConstContactsPtr &contacts, COLLISION_ITEM) {
-	if((strcmp(contacts->contact(i).collision1().c_str(), COLLISION_ITEM) == 0 ;)) {
+
+bool collisionCheck (ConstContactsPtr &contacts, int i) {
+	if((strcmp(contacts->contact(i).collision1().c_str(), COLLISION_ITEM) == 0 )) {
 		return true;
 	}
 	else {
 		return false;
 	}
 }
-*/
+
 
 
 // onCollisionMsg
@@ -290,6 +293,7 @@ void ArmPlugin::onCollisionMsg(ConstContactsPtr &contacts)
 
 			return;
 		}
+		
 		
 		
 	}
@@ -523,17 +527,6 @@ static float BoxDistance(const math::Box& a, const math::Box& b)
 }
 
 
-//check for ground Contact
-	
-bool checkGroundContact (math::Box& gripBBox, float groundContact) {
-   			if(gripBBox.min.z <= groundContact || gripBBox.max.z <= groundContact ){
-   				return true; 
-   			}
-   			else {
-   				return false;
-   			}
-			}
-
 
 // called by the world update start event
 void ArmPlugin::OnUpdate(const common::UpdateInfo& updateInfo)
@@ -602,16 +595,18 @@ void ArmPlugin::OnUpdate(const common::UpdateInfo& updateInfo)
 
 		// get the bounding box for the gripper		
 		const math::Box& gripBBox = gripper->GetBoundingBox();
-		const float groundContact = 0.05f;
+		const float groundContact = -0.0f;
 		
 		/*
 		/ TODO - set appropriate Reward for robot hitting the ground.
 		/
 		*/
+		
+		
 		// check if ground contact. 
 		
 		
-		
+		bool checkGroundContact = (gripBBox.min.z <= groundContact || gripBBox.max.z <= groundContact );
 		if(checkGroundContact) // check if gripper position is below the ground
 		{
 						
@@ -631,7 +626,7 @@ void ArmPlugin::OnUpdate(const common::UpdateInfo& updateInfo)
 		
 		if(!checkGroundContact)
 		{
-			const float distGoal = 0; // compute the reward from distance to the goal
+			const float distGoal = BoxDistance(gripBBox, propBBox); // compute the reward from distance to the goal
 
 			if(DEBUG){printf("distance('%s', '%s') = %f\n", gripper->GetName().c_str(), prop->model->GetName().c_str(), distGoal);}
 
@@ -639,10 +634,10 @@ void ArmPlugin::OnUpdate(const common::UpdateInfo& updateInfo)
 			if( episodeFrames > 1 )
 			{
 				const float distDelta  = lastGoalDistance - distGoal;
-				const float movingAvg = 0.0f;
+				const float alpha = 0.9f;
 
 				// compute the smoothed moving average of the delta of the distance to the goal
-				avgGoalDelta  = (avgGoalDelta * movingAvg) + (distDelta * (1.0f -movingAvg));
+				avgGoalDelta  = (avgGoalDelta * alpha) + (distDelta * (1.0f - alpha));
 				rewardHistory = avgGoalDelta * REWARD_MULTIPLIER;
 				newReward     = true;	
 			}
