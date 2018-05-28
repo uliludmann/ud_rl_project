@@ -30,10 +30,10 @@
 #define INPUT_CHANNELS 3
 #define ALLOW_RANDOM true
 #define DEBUG_DQN false
-#define GAMMA 0.9f
+#define GAMMA 0.95f
 #define EPS_START 0.9f
-#define EPS_END 0.05f
-#define EPS_DECAY 100 // default 200
+#define EPS_END 0.05f //0.05
+#define EPS_DECAY 400 // default 200
 
 /*
 / TODO - Tune the following hyperparameters
@@ -43,8 +43,8 @@
 #define INPUT_WIDTH   64
 #define INPUT_HEIGHT  64
 #define OPTIMIZER "RMSprop"
-#define LEARNING_RATE 0.1f //default 0.1
-#define REPLAY_MEMORY 10000
+#define LEARNING_RATE 0.2f //default 0.1
+#define REPLAY_MEMORY 100000 //10000
 #define BATCH_SIZE 32
 #define USE_LSTM true
 #define LSTM_SIZE 256
@@ -55,9 +55,9 @@
 /
 */
 
-#define REWARD_WIN  100.0f
-#define REWARD_LOSS -100.0f
-#define REWARD_MULTIPLIER 1000.0f
+#define REWARD_WIN  20.0f
+#define REWARD_LOSS -30.0f
+#define REWARD_MULTIPLIER 100.0f
 
 // Define Object Names
 #define WORLD_NAME "arm_world"
@@ -321,7 +321,7 @@ void ArmPlugin::onCollisionMsg(ConstContactsPtr &contacts)
 			//strcmp compares to strings if same returns 0
 			if (strcmp(armcollision, "arm::gripperbase::gripper_link") == 0) { // if gripper base contact 
 			printf("!!!gripper base!!!");
-			rewardHistory = 4 * REWARD_WIN;
+			rewardHistory += 4 * REWARD_WIN;
 			newReward  = true;
 			endEpisode = true;
 			return;
@@ -330,7 +330,7 @@ void ArmPlugin::onCollisionMsg(ConstContactsPtr &contacts)
 			
 			else if (strcmp(armcollision, "arm::gripper_middle::middle_collision") == 0) { // if gripper middle
 			printf("!!!middle Collision!!!\n");
-			rewardHistory = 2 * REWARD_WIN;
+			rewardHistory += 2 * REWARD_WIN;
 			newReward  = true;
 			endEpisode = true;
 			return; }
@@ -338,7 +338,7 @@ void ArmPlugin::onCollisionMsg(ConstContactsPtr &contacts)
 			
 			else if (strcmp(armcollision, "arm::link2::collision2") == 0) { // DONT DO THIS
 			printf("!!!NO!!!\n");
-			rewardHistory += 0.5 * REWARD_LOSS;
+			rewardHistory += 5 * REWARD_LOSS;
 			newReward  = true;
 			endEpisode = true;
 			return; }
@@ -622,7 +622,7 @@ void ArmPlugin::OnUpdate(const common::UpdateInfo& updateInfo)
 	if( maxEpisodeLength > 0 && episodeFrames > maxEpisodeLength )
 	{
 		printf("ArmPlugin - triggering EOE, episode has exceeded %i frames\n", maxEpisodeLength);
-		rewardHistory += REWARD_LOSS;
+		rewardHistory = REWARD_LOSS;
 		newReward     = true;
 		endEpisode    = true;
 	}
@@ -668,7 +668,7 @@ void ArmPlugin::OnUpdate(const common::UpdateInfo& updateInfo)
 						
 			if(DEBUG){printf("GROUND CONTACT, EOE\n");}
 
-			rewardHistory = REWARD_LOSS;
+			rewardHistory = 100 * REWARD_LOSS;
 			newReward     = true;
 			endEpisode    = true;
 		}
@@ -690,11 +690,11 @@ void ArmPlugin::OnUpdate(const common::UpdateInfo& updateInfo)
 			if( episodeFrames > 1 )
 			{
 				const float distDelta  = lastGoalDistance - distGoal;
-				const float alpha = 0.1f;
+				const float alpha = 0.3f;
 
 				// compute the smoothed moving average of the delta of the distance to the goal
 				avgGoalDelta  = (avgGoalDelta * alpha) + (distDelta * (1.0f - alpha));
-				rewardHistory = avgGoalDelta * REWARD_MULTIPLIER - episodeFrames * 0.2f;
+				rewardHistory = avgGoalDelta * REWARD_MULTIPLIER; // - episodeFrames * 0.01f;
 				newReward     = true;	
 			}
 
