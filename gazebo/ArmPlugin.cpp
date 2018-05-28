@@ -10,6 +10,9 @@
 #include "cudaMappedMemory.h"
 #include "cudaPlanar.h"
 
+#include <typeinfo>
+#include <iostream>
+
 #define PI 3.141592653589793238462643383279502884197169f
 
 #define JOINT_MIN	-0.75f
@@ -30,7 +33,7 @@
 #define GAMMA 0.9f
 #define EPS_START 0.9f
 #define EPS_END 0.05f
-#define EPS_DECAY 200
+#define EPS_DECAY 300 // default 200
 
 /*
 / TODO - Tune the following hyperparameters
@@ -40,7 +43,7 @@
 #define INPUT_WIDTH   64
 #define INPUT_HEIGHT  64
 #define OPTIMIZER "RMSprop"
-#define LEARNING_RATE 0.1f
+#define LEARNING_RATE 0.05f //default 0.1
 #define REPLAY_MEMORY 10000
 #define BATCH_SIZE 32
 #define USE_LSTM true
@@ -52,19 +55,23 @@
 /
 */
 
-#define REWARD_WIN  500.0f
-#define REWARD_LOSS -500.0f
-#define REWARD_MULTIPLIER 10.0f
+#define REWARD_WIN  100.0f
+#define REWARD_LOSS -100.0f
+#define REWARD_MULTIPLIER 1000.0f
 
 // Define Object Names
 #define WORLD_NAME "arm_world"
 #define PROP_NAME  "tube"
 #define GRIP_NAME  "gripper_middle"
 
+
 // Define Collision Parameters
 #define COLLISION_FILTER "ground_plane::link::collision"
-#define COLLISION_ITEM   "tube::tube_link::tube_collision"
-#define COLLISION_POINT  "arm::gripperbase::gripper_link"
+#define COLLISION_ITEM   "tube::link::tube_collision"
+#define COLLISION_POINT  "arm::gripper_middle::middle_collision"
+#define GRIPPER_CONTACT "arm::gripperbase::gripper_link"
+#define GRIPPER_LEFT ""
+#define GRIPPER_RIGHT ""
 
 // Animation Steps
 #define ANIMATION_STEPS 1000
@@ -195,7 +202,20 @@ bool ArmPlugin::createAgent()
 	return true;
 }
 
+/*
+//measure distance between gripper middle and tube
+float current_dist () {
+	PropPlugin* prop = GetPropByName(PROP_NAME);
+	const math::Box& propBBox = prop->model->GetBoundingBox();
+	
+	physics::LinkPtr gripper  = model->GetLink(GRIP_NAME);
+	const math::Box& gripBBox = gripper->GetBoundingBox();
+	float distGoal = BoxDistance(gripBBox, propBBox);
+	return distGoal;
+		
+}
 
+*/
 
 // onCameraMsg
 void ArmPlugin::onCameraMsg(ConstImageStampedPtr &_msg)
@@ -250,13 +270,18 @@ void ArmPlugin::onCameraMsg(ConstImageStampedPtr &_msg)
 
 
 bool collisionCheck (ConstContactsPtr &contacts, int i) {
-	if((strcmp(contacts->contact(i).collision1().c_str(), COLLISION_ITEM) == 0 )) {
+	if((strcmp(contacts->contact(i).collision1().c_str(), COLLISION_ITEM) == 0 )) { //was COLLISION_ITEM
 		return true;
 	}
 	else {
 		return false;
 	}
 }
+
+const char * collision1 = "arm::gripperbase::gripper_link";
+const char * collision2 = "arm::gripper_middle::middle_collision";
+const char * collision3 = "arm::link2::collision2";
+const char * collision4 = "arm::gripperbase::gripper_link";
 
 
 
@@ -281,21 +306,60 @@ void ArmPlugin::onCollisionMsg(ConstContactsPtr &contacts)
 		/ TODO - Check if there is collision between the arm and object, then issue learning reward
 		/
 		*/
-		
-		
+
 		
 		if (collisionCheck)
 		{
+			const char * armcollision = contacts->contact(i).collision2().c_str();
+			std::cout << "DATA FORMAT OF COLLSION NAME :" << typeid(contacts->contact(i).collision1().c_str()).name() << std::endl;
+			std::cout << "DATA FORMAT OF ARM NAME :" << typeid(armcollision).name() << std::endl;
+			const int test = 0;
+			std::cout << "Value of strcmp :" << strcmp(armcollision, armcollision) << std::endl;
+			std::cout << "Type of cout :" << typeid(strcmp(armcollision, collision1)).name() << std::endl;
+			std::cout << (strcmp(armcollision, armcollision) == test) << std::endl;
+			
+			//strcmp compares to strings if same returns 0
+			if (strcmp(armcollision, collision1) == test) { // if gripper base contact 
+			printf("!!!gripper base!!!");
 			rewardHistory = REWARD_WIN;
-
 			newReward  = true;
 			endEpisode = true;
-
 			return;
+			}
+			
+			
+			else if (strcmp(armcollision, collision2) == test) { // if gripper middle
+			printf("!!!middle Collision!!!\n");
+			rewardHistory = 2 * REWARD_WIN;
+			newReward  = true;
+			endEpisode = true;
+			return; }
+			
+			else if (strcmp(armcollision, collision4) == test) { // if gripper middle
+			printf("!!!middle Collision!!!\n");
+			rewardHistory = 2 * REWARD_WIN;
+			newReward  = true;
+			endEpisode = true;
+			return; }
+			
+			
+			else if (strcmp(armcollision, collision3) == test) { // DONT DO THIS
+			printf("!!!NO!!!\n");
+			rewardHistory += REWARD_LOSS;
+			newReward  = true;
+			endEpisode = true;
+			return; }
+			
+			
+			else {
+			printf("!!!Else...!!!\n" );
+			rewardHistory += 0.5f * REWARD_LOSS;
+			newReward  = true;
+			endEpisode = true;
+			return;
+			}		
+		
 		}
-		
-		
-		
 	}
 }
 
@@ -566,7 +630,7 @@ void ArmPlugin::OnUpdate(const common::UpdateInfo& updateInfo)
 	if( maxEpisodeLength > 0 && episodeFrames > maxEpisodeLength )
 	{
 		printf("ArmPlugin - triggering EOE, episode has exceeded %i frames\n", maxEpisodeLength);
-		rewardHistory = REWARD_LOSS;
+		rewardHistory += REWARD_LOSS;
 		newReward     = true;
 		endEpisode    = true;
 	}
@@ -595,7 +659,7 @@ void ArmPlugin::OnUpdate(const common::UpdateInfo& updateInfo)
 
 		// get the bounding box for the gripper		
 		const math::Box& gripBBox = gripper->GetBoundingBox();
-		const float groundContact = -0.0f;
+		const float groundContact = -0.2f;
 		
 		/*
 		/ TODO - set appropriate Reward for robot hitting the ground.
@@ -612,7 +676,7 @@ void ArmPlugin::OnUpdate(const common::UpdateInfo& updateInfo)
 						
 			if(DEBUG){printf("GROUND CONTACT, EOE\n");}
 
-			rewardHistory = REWARD_LOSS;
+			rewardHistory += REWARD_LOSS;
 			newReward     = true;
 			endEpisode    = true;
 		}
@@ -634,11 +698,11 @@ void ArmPlugin::OnUpdate(const common::UpdateInfo& updateInfo)
 			if( episodeFrames > 1 )
 			{
 				const float distDelta  = lastGoalDistance - distGoal;
-				const float alpha = 0.0f;
+				const float alpha = 0.1f;
 
 				// compute the smoothed moving average of the delta of the distance to the goal
 				avgGoalDelta  = (avgGoalDelta * alpha) + (distDelta * (1.0f - alpha));
-				rewardHistory = avgGoalDelta * REWARD_MULTIPLIER;
+				rewardHistory = avgGoalDelta * REWARD_MULTIPLIER - episodeFrames * 0.2f;
 				newReward     = true;	
 			}
 
@@ -680,4 +744,3 @@ void ArmPlugin::OnUpdate(const common::UpdateInfo& updateInfo)
 }
 
 }
-
