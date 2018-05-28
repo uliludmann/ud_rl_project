@@ -33,7 +33,7 @@
 #define GAMMA 0.9f
 #define EPS_START 0.9f
 #define EPS_END 0.05f
-#define EPS_DECAY 300 // default 200
+#define EPS_DECAY 100 // default 200
 
 /*
 / TODO - Tune the following hyperparameters
@@ -43,7 +43,7 @@
 #define INPUT_WIDTH   64
 #define INPUT_HEIGHT  64
 #define OPTIMIZER "RMSprop"
-#define LEARNING_RATE 0.05f //default 0.1
+#define LEARNING_RATE 0.1f //default 0.1
 #define REPLAY_MEMORY 10000
 #define BATCH_SIZE 32
 #define USE_LSTM true
@@ -70,8 +70,7 @@
 #define COLLISION_ITEM   "tube::link::tube_collision"
 #define COLLISION_POINT  "arm::gripper_middle::middle_collision"
 #define GRIPPER_CONTACT "arm::gripperbase::gripper_link"
-#define GRIPPER_LEFT ""
-#define GRIPPER_RIGHT ""
+
 
 // Animation Steps
 #define ANIMATION_STEPS 1000
@@ -306,36 +305,30 @@ void ArmPlugin::onCollisionMsg(ConstContactsPtr &contacts)
 		/ TODO - Check if there is collision between the arm and object, then issue learning reward
 		/
 		*/
-
+		const char * armcollision = contacts->contact(i).collision2().c_str();
 		
-		if (collisionCheck)
-		{
-			const char * armcollision = contacts->contact(i).collision2().c_str();
+		
+		if(DEBUG) {
 			std::cout << "DATA FORMAT OF COLLSION NAME :" << typeid(contacts->contact(i).collision1().c_str()).name() << std::endl;
 			std::cout << "DATA FORMAT OF ARM NAME :" << typeid(armcollision).name() << std::endl;
 			const int test = 0;
 			std::cout << "Value of strcmp :" << strcmp(armcollision, armcollision) << std::endl;
 			std::cout << "Type of cout :" << typeid(strcmp(armcollision, collision1)).name() << std::endl;
 			std::cout << (strcmp(armcollision, armcollision) == test) << std::endl;
+		}
+		
 			
 			//strcmp compares to strings if same returns 0
-			if (strcmp(armcollision, collision1) == test) { // if gripper base contact 
+			if (strcmp(armcollision, "arm::gripperbase::gripper_link") == 0) { // if gripper base contact 
 			printf("!!!gripper base!!!");
-			rewardHistory = REWARD_WIN;
+			rewardHistory = 4 * REWARD_WIN;
 			newReward  = true;
 			endEpisode = true;
 			return;
 			}
 			
 			
-			else if (strcmp(armcollision, collision2) == test) { // if gripper middle
-			printf("!!!middle Collision!!!\n");
-			rewardHistory = 2 * REWARD_WIN;
-			newReward  = true;
-			endEpisode = true;
-			return; }
-			
-			else if (strcmp(armcollision, collision4) == test) { // if gripper middle
+			else if (strcmp(armcollision, "arm::gripper_middle::middle_collision") == 0) { // if gripper middle
 			printf("!!!middle Collision!!!\n");
 			rewardHistory = 2 * REWARD_WIN;
 			newReward  = true;
@@ -343,9 +336,9 @@ void ArmPlugin::onCollisionMsg(ConstContactsPtr &contacts)
 			return; }
 			
 			
-			else if (strcmp(armcollision, collision3) == test) { // DONT DO THIS
+			else if (strcmp(armcollision, "arm::link2::collision2") == 0) { // DONT DO THIS
 			printf("!!!NO!!!\n");
-			rewardHistory = REWARD_LOSS;
+			rewardHistory += 0.5 * REWARD_LOSS;
 			newReward  = true;
 			endEpisode = true;
 			return; }
@@ -360,7 +353,6 @@ void ArmPlugin::onCollisionMsg(ConstContactsPtr &contacts)
 			}		
 		
 		}
-	}
 }
 
 
@@ -659,7 +651,7 @@ void ArmPlugin::OnUpdate(const common::UpdateInfo& updateInfo)
 
 		// get the bounding box for the gripper		
 		const math::Box& gripBBox = gripper->GetBoundingBox();
-		const float groundContact = -0.2f;
+		const float groundContact = 0.0f;
 		
 		/*
 		/ TODO - set appropriate Reward for robot hitting the ground.
@@ -676,7 +668,7 @@ void ArmPlugin::OnUpdate(const common::UpdateInfo& updateInfo)
 						
 			if(DEBUG){printf("GROUND CONTACT, EOE\n");}
 
-			rewardHistory += REWARD_LOSS;
+			rewardHistory = REWARD_LOSS;
 			newReward     = true;
 			endEpisode    = true;
 		}
