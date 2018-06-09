@@ -31,9 +31,9 @@
 #define ALLOW_RANDOM true
 #define DEBUG_DQN false
 #define GAMMA 0.95f
-#define EPS_START 0.9f
+#define EPS_START 0.5f //0.9f
 #define EPS_END 0.05f //0.05
-#define EPS_DECAY 400 // default 200
+#define EPS_DECAY 100 // default 200
 
 /*
 / TODO - Tune the following hyperparameters
@@ -43,7 +43,7 @@
 #define INPUT_WIDTH   64
 #define INPUT_HEIGHT  64
 #define OPTIMIZER "RMSprop"
-#define LEARNING_RATE 0.2f //default 0.1
+#define LEARNING_RATE 0.3f //default 0.1
 #define REPLAY_MEMORY 100000 //10000
 #define BATCH_SIZE 32
 #define USE_LSTM false
@@ -321,7 +321,7 @@ void ArmPlugin::onCollisionMsg(ConstContactsPtr &contacts)
 			//strcmp compares to strings if same returns 0
 			if (strcmp(armcollision, "arm::gripperbase::gripper_link") == 0) { // if gripper base contact 
 			printf("!!!gripper base!!!");
-			rewardHistory += 4 * REWARD_WIN;
+			rewardHistory = 4 * REWARD_WIN;
 			newReward  = true;
 			endEpisode = true;
 			return;
@@ -330,7 +330,7 @@ void ArmPlugin::onCollisionMsg(ConstContactsPtr &contacts)
 			
 			else if (strcmp(armcollision, "arm::gripper_middle::middle_collision") == 0) { // if gripper middle
 			printf("!!!middle Collision!!!\n");
-			rewardHistory += 2 * REWARD_WIN;
+			rewardHistory = 2 * REWARD_WIN;
 			newReward  = true;
 			endEpisode = true;
 			return; }

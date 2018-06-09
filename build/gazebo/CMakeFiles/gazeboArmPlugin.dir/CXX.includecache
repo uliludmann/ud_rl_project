@@ -15,6 +15,10 @@ cudaMappedMemory.h
 /home/nvidia/Downloads/RoboND-DeepRL-Project/gazebo/cudaMappedMemory.h
 cudaPlanar.h
 /home/nvidia/Downloads/RoboND-DeepRL-Project/gazebo/cudaPlanar.h
+typeinfo
+-
+iostream
+-
 
 /home/nvidia/Downloads/RoboND-DeepRL-Project/gazebo/ArmPlugin.h
 deepRL.h
