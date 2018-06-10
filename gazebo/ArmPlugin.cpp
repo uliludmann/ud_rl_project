@@ -43,8 +43,8 @@
 #define INPUT_WIDTH   64
 #define INPUT_HEIGHT  64
 #define OPTIMIZER "RMSprop"
-#define LEARNING_RATE 0.3f //default 0.1
-#define REPLAY_MEMORY 100000 //10000
+#define LEARNING_RATE 0.28f //default 0.1
+#define REPLAY_MEMORY 100 //10000
 #define BATCH_SIZE 32
 #define USE_LSTM false
 #define LSTM_SIZE 256
@@ -213,7 +213,6 @@ float current_dist () {
 	return distGoal;
 		
 }
-
 */
 
 // onCameraMsg

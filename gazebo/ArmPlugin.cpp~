@@ -31,8 +31,8 @@
 #define ALLOW_RANDOM true
 #define DEBUG_DQN false
 #define GAMMA 0.95f
-#define EPS_START 0.9f
-#define EPS_END 0.3f //0.05
+#define EPS_START 0.5f //0.9f
+#define EPS_END 0.05f //0.05
 #define EPS_DECAY 100 // default 200
 
 /*
@@ -43,7 +43,7 @@
 #define INPUT_WIDTH   64
 #define INPUT_HEIGHT  64
 #define OPTIMIZER "RMSprop"
-#define LEARNING_RATE 0.3f //default 0.1
+#define LEARNING_RATE 0.28f //default 0.1
 #define REPLAY_MEMORY 100000 //10000
 #define BATCH_SIZE 32
 #define USE_LSTM false
@@ -213,7 +213,6 @@ float current_dist () {
 	return distGoal;
 		
 }
-
 */
 
 // onCameraMsg
